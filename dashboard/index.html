@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCP vs UDP | Telemetria de Sockets</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Style CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="bg-glow"></div>
+
+    <!-- PORTAL DE AUTENTICAÇÃO -->
+    <div id="auth-container" class="auth-wrapper">
+        <div class="auth-card glass-card">
+            <div class="auth-header">
+                <i class="fa-solid fa-circle-nodes auth-logo-icon animate-pulse"></i>
+                <h2>SOCKETS <span class="text-gradient" style="font-size: 1.6rem; font-weight:800;">SECURE ACCESS</span></h2>
+                <p class="auth-subtitle">Entre no Laboratório de Sockets de Redes</p>
+            </div>
+            
+            <!-- Tabs for Login / Register -->
+            <div class="auth-tabs">
+                <button class="auth-tab-btn active" id="tab-login-btn" onclick="switchAuthTab('login')">Acessar</button>
+                <button class="auth-tab-btn" id="tab-register-btn" onclick="switchAuthTab('register')">Registrar-se</button>
+            </div>
+            
+            <!-- Login Form -->
+            <div id="form-login" class="auth-form-content">
+                <div class="form-group">
+                    <label for="login-username">Nome de Usuário</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-user input-icon"></i>
+                        <input type="text" id="login-username" placeholder="ex: alice_123">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="login-password">Senha</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="login-password" placeholder="••••••••">
+                    </div>
+                </div>
+                <button class="btn btn-tcp btn-block" onclick="submitLogin()" style="width: 100%; margin-top: 10px;">
+                    <i class="fa-solid fa-right-to-bracket"></i> Entrar na Suite
+                </button>
+            </div>
+            
+            <!-- Register Form -->
+            <div id="form-register" class="auth-form-content" style="display: none;">
+                <div class="form-group">
+                    <label for="register-name">Nome Completo</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-id-card input-icon"></i>
+                        <input type="text" id="register-name" placeholder="ex: Alice Silva">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="register-username">Nome de Utilizador</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-user-tag input-icon"></i>
+                        <input type="text" id="register-username" placeholder="ex: alice_123">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="register-password">Senha de Acesso</label>
+                    <div class="input-icon-wrapper">
+                        <i class="fa-solid fa-lock input-icon"></i>
+                        <input type="password" id="register-password" placeholder="Crie uma senha forte">
+                    </div>
+                </div>
+                <button class="btn btn-udp btn-block" onclick="submitRegister()" style="width: 100%; margin-top: 10px;">
+                    <i class="fa-solid fa-user-plus"></i> Registrar Conta
+                </button>
+            </div>
+            
+            <!-- Status/Error Alerts -->
+            <div id="auth-alert" class="auth-alert-box" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="container" id="main-dashboard-container" style="display: none;">
+        <!-- Header -->
+        <header>
+            <div class="header-logo">
+                <i class="fa-solid fa-circle-nodes logo-icon"></i>
+                <div>
+                    <h1>SOCKETS <span class="text-gradient">TCP vs UDP</span></h1>
+                    <p class="subtitle">Análise Comparativa de Protocolos de Transporte | Sistemas Distribuídos</p>
+                </div>
+            </div>
+            <div class="server-status">
+                <div class="status-indicator active" id="server-tcp-status">
+                    <span class="dot tcp-dot"></span> TCP (Port 5001)
+                </div>
+                <div class="status-indicator active" id="server-udp-status">
+                    <span class="dot udp-dot"></span> UDP (Port 5002)
+                </div>
+                <!-- Active User Profile Section -->
+                <div class="status-indicator user-profile-badge" id="user-profile-badge" style="display: flex;">
+                    <i class="fa-solid fa-user-astronaut text-gradient" style="font-size: 1.1rem; margin-right: 4px;"></i>
+                    <span id="header-user-name" style="font-weight: 700;">Visitante</span>
+                    <button class="logout-btn" onclick="triggerLogout()" title="Sair" style="background:none; border:none; color:var(--text-muted); cursor:pointer; margin-left:8px; transition:var(--transition-smooth);"><i class="fa-solid fa-right-from-bracket"></i></button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('telemetry')">
+                <i class="fa-solid fa-chart-line"></i> Painel de Telemetria
+            </button>
+            <button class="tab-btn" onclick="switchTab('interactive')">
+                <i class="fa-solid fa-comments"></i> Chat Interativo
+            </button>
+            <button class="tab-btn" onclick="switchTab('report')">
+                <i class="fa-solid fa-file-invoice"></i> Relatório Acadêmico
+            </button>
+        </div>
+
+        <!-- MAIN PANEL -->
+        <main class="tab-content" id="tab-telemetry">
+            <div class="grid-layout">
+                
+                <!-- Sidebar Control & Single Message Tests -->
+                <div class="control-sidebar">
+                    <!-- Config Box -->
+                    <div class="glass-card">
+                        <h3><i class="fa-solid fa-sliders text-cyan"></i> Configurar Benchmark</h3>
+                        <p class="card-desc">Defina as variáveis para disparar testes de estresse automatizados.</p>
+                        
+                        <div class="form-group">
+                            <label for="num_messages">Quantidade de Mensagens</label>
+                            <input type="number" id="num_messages" value="1000" min="10" max="10000">
+                            <span class="input-hint">Msgs a serem enviadas sequencialmente</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="interval_ms">Intervalo entre Msgs (ms)</label>
+                            <input type="number" id="interval_ms" value="2" min="0" max="1000">
+                            <span class="input-hint">0ms = Rajada (Stress Burst)</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="payload_size">Tamanho do Payload (Bytes)</label>
+                            <input type="number" id="payload_size" value="256" min="8" max="65500">
+                            <span class="input-hint">Tamanho dos dados em cada mensagem</span>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="simulated_loss">Simulação de Perda UDP (%)</label>
+                            <div class="range-container">
+                                <input type="range" id="simulated_loss" min="0" max="50" value="0" oninput="updateLossLabel(this.value)">
+                                <span class="range-val" id="loss-val">0%</span>
+                            </div>
+                            <span class="input-hint">Simula instabilidade na recepção UDP</span>
+                        </div>
+                        
+                        <div class="action-buttons">
+                            <button class="btn btn-tcp" id="run-tcp-btn" onclick="triggerBenchmark('TCP')">
+                                <i class="fa-solid fa-play"></i> Testar TCP
+                            </button>
+                            <button class="btn btn-udp" id="run-udp-btn" onclick="triggerBenchmark('UDP')">
+                                <i class="fa-solid fa-play"></i> Testar UDP
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Mini Terminal Logs -->
+                    <div class="glass-card logger-card">
+                        <div class="logger-header">
+                            <h3><i class="fa-solid fa-terminal text-purple"></i> Log de Transmissão</h3>
+                            <button class="clear-btn" onclick="clearConsole()"><i class="fa-solid fa-trash-can"></i></button>
+                        </div>
+                        <div class="console-body" id="console-logs">
+                            <div class="log-line system">[SISTEMA] Dashboard carregado. Pronto para iniciar testes.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Telemetry Visualization Area -->
+                <div class="telemetry-dashboard">
+                    <!-- Metrics Summary Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-card card-cyan">
+                            <div class="metric-hdr">
+                                <span>Latência Média (RTT)</span>
+                                <i class="fa-solid fa-gauge-high"></i>
+                            </div>
+                            <div class="metric-val" id="metric-avg-rtt">-- <span class="unit">ms</span></div>
+                            <div class="metric-footer">Mín: <span id="metric-min-rtt">--</span> ms | Máx: <span id="metric-max-rtt">--</span> ms</div>
+                        </div>
+                        
+                        <div class="metric-card card-orange">
+                            <div class="metric-hdr">
+                                <span>Perda de Pacotes</span>
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                            <div class="metric-val" id="metric-loss">-- <span class="unit">%</span></div>
+                            <div class="metric-footer">Perdidas: <span id="metric-lost-count">--</span> / <span id="metric-sent-count">--</span></div>
+                        </div>
+                        
+                        <div class="metric-card card-green">
+                            <div class="metric-hdr">
+                                <span>Vazão (Throughput)</span>
+                                <i class="fa-solid fa-bolt"></i>
+                            </div>
+                            <div class="metric-val" id="metric-throughput">-- <span class="unit">msg/s</span></div>
+                            <div class="metric-footer">Velocidade: <span id="metric-kb-throughput">--</span> KB/s</div>
+                        </div>
+                        
+                        <div class="metric-card card-magenta">
+                            <div class="metric-hdr">
+                                <span>Fora de Ordem</span>
+                                <i class="fa-solid fa-arrow-down-up-lock"></i>
+                            </div>
+                            <div class="metric-val" id="metric-out-order">-- <span class="unit">%</span></div>
+                            <div class="metric-footer">Quantidade: <span id="metric-out-count">--</span> pacotes</div>
+                        </div>
+                    </div>
+
+                    <!-- Progress Bar for active runs -->
+                    <div class="progress-bar-container" id="benchmark-progress-container" style="display: none;">
+                        <div class="progress-label-row">
+                            <span id="progress-status-text">Executando teste no socket...</span>
+                            <span id="progress-percent">0%</span>
+                        </div>
+                        <div class="progress-track">
+                            <div class="progress-bar" id="benchmark-progress-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Main Charts Section -->
+                    <div class="charts-area">
+                        <!-- Chart 1: Latency Bar / Line Comparison -->
+                        <div class="glass-card chart-card">
+                            <div class="chart-header">
+                                <h4><i class="fa-solid fa-chart-simple"></i> Histórico Comparativo de Latência (RTT)</h4>
+                                <div class="chart-controls">
+                                    <span class="badge badge-tcp">TCP</span>
+                                    <span class="badge badge-udp">UDP</span>
+                                </div>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="latencyChart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Chart 2: CPU & Memory usage side-by-side -->
+                        <div class="glass-card chart-card">
+                            <div class="chart-header">
+                                <h4><i class="fa-solid fa-microchip"></i> Pegada de Recursos de Sistema (Servidor + Cliente)</h4>
+                                <span class="badge badge-system">Hardware Metrics</span>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="resourcesChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table of past runs -->
+                    <div class="glass-card table-card">
+                        <h4><i class="fa-solid fa-history"></i> Histórico de Execuções Recentes</h4>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Protocolo</th>
+                                        <th>Configuração</th>
+                                        <th>Perda %</th>
+                                        <th>RTT Médio</th>
+                                        <th>Vazão</th>
+                                        <th>Desordem</th>
+                                        <th>CPU Servidor</th>
+                                        <th>RAM Servidor</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-table-body">
+                                    <tr class="empty-row">
+                                        <td colspan="8">Nenhum teste executado nesta sessão.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div> <!-- Closes table-card -->
+                </div> <!-- Closes telemetry-dashboard -->
+            </div> <!-- Closes grid-layout -->
+        </main> <!-- Closes tab-telemetry -->
+
+        <!-- INTERACTIVE CHAT PANEL -->
+        <main class="tab-content" id="tab-interactive" style="display: none;">
+                    <div class="chat-intro glass-card">
+                        <h3><i class="fa-solid fa-comments text-gradient"></i> Laboratório de Chat Distribuído Persistente</h3>
+                    </div>
+
+                    <!-- Protocol Switcher Card -->
+                    <div class="chat-protocol-selector-card glass-card">
+                        <span class="selector-label"><i class="fa-solid fa-circle-info text-cyan"></i> Protocolo Ativo:</span>
+                        <div class="protocol-switch">
+                            <button class="proto-switch-btn active" id="btn-proto-tcp" onclick="selectChatProtocol('TCP')">
+                                <i class="fa-solid fa-circle-nodes"></i> Socket TCP (Stream Confiável)
+                            </button>
+                            <button class="proto-switch-btn" id="btn-proto-udp" onclick="selectChatProtocol('UDP')">
+                                <i class="fa-solid fa-share-nodes"></i> Socket UDP (Datagrama Rápido)
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="chat-grid">
+                        <!-- Unified Chat Room Card -->
+                        <div class="glass-card chat-card-wrapper tcp-theme main-chat-room">
+                            <div class="chat-wrapper-header">
+                                <div class="chat-title">
+                                    <i class="fa-solid fa-comments text-cyan"></i>
+                                    <div>
+                                        <h4>Sala de Conversa Geral</h4>
+                                        <span class="chat-conn-type" id="chat-active-protocol-lbl">Canal: TCP (Conexão Persistente)</span>
+                                    </div>
+                                </div>
+                                <span class="pulse-badge active" id="chat-active-user-badge"><i class="fa-solid fa-user text-cyan"></i> Visitante</span>
+                            </div>
+                            
+                            <div class="chat-messages" id="unified-chat-messages">
+                                <div class="chat-system-msg">Bem-vindo à sala de sockets. Envie uma mensagem no prompt!</div>
+                            </div>
+                            
+                            <div class="chat-input-row">
+                                <input type="text" id="unified-chat-input" placeholder="Digite uma mensagem..." onkeydown="handleUnifiedChatKey(event)">
+                                <button class="chat-send-btn btn-tcp" id="unified-send-btn" onclick="sendUnifiedMessage()">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+        <!-- ACADEMIC REPORT PANEL -->
+        <main class="tab-content" id="tab-report" style="display: none;">
+            <div class="glass-card report-action-bar">
+                <div>
+                    <h3><i class="fa-solid fa-file-invoice text-gradient"></i> Relatório de Avaliação Contínua</h3>
+                    <p>O painel compilou os resultados coletados do seu benchmark ativo diretamente na estrutura acadêmica exigida pelo professor.</p>
+                </div>
+                <button class="btn btn-print" onclick="window.print()">
+                    <i class="fa-solid fa-print"></i> Imprimir / Salvar PDF
+                </button>
+            </div>
+
+            <!-- Printable Academic Document Frame -->
+            <div class="academic-sheet" id="printable-report-content">
+                
+                <!-- CAPA (PAGE 1) -->
+
+                
+
+                <div class="academic-page academic-cover">
+
+                    <div class="cover-logo-container">
+                        <!-- Logo UnIA Oficial -->
+                        <img src="unia_logo.png" alt="Logo UnIA" class="cover-logo-img">
+                    </div>
+
+                    <div class="cover-header">
+                        <h1>Universidade Independente de Angola</h1>
+                        <h2>Faculdade de Ciências de Engenharia e Tecnologias</h2>
+                    </div>
+
+                    <div class="cover-title-box">
+                        <h2>Relatório de Análise Prática Comparativa:<br>Sockets TCP vs UDP</h2>
+                    </div>
+
+                    <div class="cover-details-box">
+                        <div class="cover-details">
+                            <p><strong>Curso:</strong> Engenharia Informática</p>
+                            <p><strong>Disciplina:</strong> Sistemas Distribuídos</p>
+                            <p><strong>Docente / Instrutora:</strong> Prof. Maria Teca</p>
+                        </div>
+                    </div>
+
+                    <div class="cover-footer">
+                        Luanda, 2026
+                    </div>
+                </div>
+
+                <!-- CONTRA-CAPA (PAGE 2) -->
+                <div class="academic-page">
+                    <div class="integrantes-title-box">
+                        <h3>Lista dos Integrantes</h3>
+                    </div>
+                    
+                    <p style="text-indent: 0; text-align: center; margin-bottom: 40px; color: #475569; font-size: 1rem;">
+                        O presente relatório técnico-científico foi desenvolvido de forma colaborativa pelos integrantes do terceiro ano de Engenharia Informática listados a seguir:
+                    </p>
+
+                    <table class="academic-table-integrantes">
+                        <thead>
+                            <tr>
+                                <th style="width: 25%;">Número de estudante</th>
+                                <th style="width: 50%;">Nome</th>
+                                <th style="width: 25%;">Classificação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>230163</strong></td>
+                                <td>Alberto Joaquim</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td><strong>230750</strong></td>
+                                <td>Daniel Sebastião</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td><strong>231529</strong></td>
+                                <td>Ivanova Manuel</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td><strong>231530</strong></td>
+                                <td>Jordan Pedro</td>
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <td><strong>231312</strong></td>
+                                <td>Sildio Evaristo</td>
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <div style="margin-top: 180px; border-top: 1px solid #cbd5e1; padding-top: 30px; font-size: 0.95rem; color: #64748b;">
+                        <p style="text-indent: 0; text-align: justify; line-height: 1.6;">
+                            <strong>Nota Metodológica:</strong> A equipe operou sob um modelo concorrente para implementar tanto os sockets síncronos fundamentais em linguagem Python, o fluxo de comunicação de echos, a interface web unificada dotada de glassmorphism, e a persistência total das conversações via banco de dados relacional local SQLite.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- PONTO 1 (PAGE 3) -->
+                <div class="academic-page">
+                    <div class="academic-section">
+                        <h4>1. Introdução</h4>
+                        <p>No âmbito da engenharia de redes contemporânea e do projeto de sistemas distribuídos, a comunicação interprocessos (IPC) por meio de sockets de rede constitui o bloco de construção básico para a criação de sistemas heterogêneos distribuídos. Este relatório de avaliação prática documenta e discute uma análise empírica comparativa profunda entre os dois protocolos essenciais operantes no nível de transporte do modelo conceitual TCP/IP: o <strong>Transmission Control Protocol (TCP)</strong> e o <strong>User Datagram Protocol (UDP)</strong>.</p>
+                        <p>O foco central deste estudo reside em quantificar e confrontar o comportamento dinâmico de ambos os protocolos diante de rajadas maciças de tráfego (stress tests). Para tanto, construímos uma suíte experimental que mensura com precisão nanométrica tempos de ida e volta (RTT - Round Trip Time), taxas intrínsecas e induzidas de perda de pacotes, ocorrências de inversão de pacotes fora de ordem (out-of-order) e o custo computacional de CPU e memória RAM envolvidos no tráfego loopback local.</p>
+                        <p>Além das métricas brutas de benchmark, implementamos com sucesso uma aplicação de chat concorrente dotada de persistência real de mensagens. A persistência baseia-se em uma base de dados relacional compacta <strong>SQLite</strong>, provendo consistência às credenciais cadastrais e histórico de conversas. Com isso, validamos de forma prática a coexistência de fluxos confiáveis e fluxos de datagrama rápidos na mesma suite distribuída acadêmica.</p>
+                    </div>
+                </div>
+
+                <!-- PONTO 2 (PAGE 4) -->
+                <div class="academic-page">
+                    <div class="academic-section">
+                        <h4>2. Fundamentação Teórica</h4>
+                        <p>A camada de transporte estabelece a comunicação lógica síncrona ou assíncrona entre processos da camada de aplicação executando em nós distintos. As características de design do TCP e UDP revelam trade-offs específicos de cada especificação teórica:</p>
+                        <ul>
+                            <li><strong>TCP (SOCK_STREAM)</strong>: Caracteriza-se por ser orientado à conexão e baseado em fluxo contínuo de bytes estruturado. O handshake de três vias (SYN, SYN-ACK, ACK) assegura a presença ativa de ambas as partes antes do tráfego. Ele provê entrega totalmente confiável utilizando numeração sequencial de segmentos, temporizadores adaptativos de retransmissão e buffers que remontam as mensagens na ordem exata emitida. Para evitar o colapso de rede, adota mecanismos robustos de controle de congestionamento (ex: Slow Start, Congestion Avoidance) e controle de fluxo por janelas deslizantes. O cabeçalho impõe um overhead de 20 bytes por segmento.</li>
+                            <li><strong>UDP (SOCK_DGRAM)</strong>: Caracteriza-se por ser um protocolo sem conexão e baseado em datagramas discretos. Não há controle de fluxo nem buffers de ordenação. Cada datagrama de dados viaja de forma independente, sem garantias de entrega ou preservação de sequência. Entretanto, a ausência de controle transacional resulta em um overhead mínimo de cabeçalho de apenas 8 bytes. A eliminação do processamento interno de handshakes e verificações acumulativas de ACKs permite ao UDP alcançar latências mínimas de tráfego, ideal para aplicações ágeis.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- PONTO 3 (PAGE 5) -->
+                <div class="academic-page">
+                    <div class="academic-section">
+                        <h4>3. Metodologia</h4>
+                        <p>Os testes comparativos foram desenhados e executados em uma rede isolada local por meio da interface de loopback de sistema (127.0.0.1) do Windows, garantindo que variações na infraestrutura física ou interferências de rádio de redes sem fio não atuassem como variáveis indesejáveis de ruído. O ecossistema de software emprega quatro componentes fundamentais:</p>
+                        <ol>
+                            <li><strong>tcp_server.py & tcp_client.py</strong>: Responsáveis por estabelecer conexões ativas na porta 5001, empregando multithreading no lado servidor para processar requisições concorrentes de echo.</li>
+                            <li><strong>udp_server.py & udp_client.py</strong>: Configurados para escuta síncrona na porta 5002, processando datagramas autônomos. Suporta a injeção artificial de perda de pacotes para simulação de links instáveis de rádio.</li>
+                            <li><strong>benchmark_orchestrator.py</strong>: Suite responsável por despachar as threads clientes, transmitir payloads customizados sob intervalos precisos e mensurar a latência com a biblioteca nativa `time.perf_counter`. Adicionalmente, emprega o framework `psutil` para monitorar a pegada de CPU e memória RAM dos processos servidores.</li>
+                            <li><strong>web_dashboard_server.py</strong>: Servidor HTTP multithread responsável por agregar e servir as páginas estáticas, intermediar os disparos de benchmark e alimentar os logs de auditoria acadêmica.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <!-- PONTO 4 (PAGE 6) -->
+                <div class="academic-page">
+                    <div class="academic-section">
+                        <h4>4. Desenvolvimento das Aplicações</h4>
+                        <p>A implementação conceitual seguiu os padrões clássicos das APIs de sockets BSD do Python. O trecho síncrono a seguir ilustra a abertura do canal de escuta e configurações de reuso nos servidores TCP e UDP:</p>
+                        <pre><code># Abstração de inicialização clássica TCP
+server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+server_tcp.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+server_tcp.bind(('127.0.0.1', 5001))
+server_tcp.listen(10)
+
+# Abstração de inicialização clássica UDP
+server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_udp.bind(('127.0.0.1', 5002))</code></pre>
+                        <p>Para garantir a segurança acadêmica do portal e persistência dos dados concorrentes do chat geral, integramos uma base de dados relacional <strong>SQLite</strong> (`chat_database.db`). Criamos duas tabelas principais:</p>
+                        <ul>
+                            <li><strong>`users`</strong>: Armazena o ID, Nome Completo, Nome de Utilizador (UNIQUE para impedir registros duplicados), e o hash de senha criptográfica de via única (SHA-256 via `hashlib`).</li>
+                            <li><strong>`messages`</strong>: Persiste o protocolo (TCP/UDP), o nome de utilizador do remetente, o conteúdo bruto do payload de texto, o timestamp Unix de alta resolução, e o número lógico de sequência da mensagem.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- PONTO 5 (PAGE 7) -->
+                <div class="academic-page">
+                    <div class="academic-section" style="margin-bottom: 10px;">
+                        <h4>5. Testes e Resultados</h4>
+                        <p>A tabela comparativa a seguir consolida as métricas capturadas em tempo real durante a execução ativa do benchmark executado por esta sessão do dashboard:</p>
+                    </div>
+                    
+                    <div class="academic-table-container">
+                        <table class="academic-results-table">
+                            <thead>
+                                <tr>
+                                    <th>Protocolo</th>
+                                    <th>Msgs Enviadas</th>
+                                    <th>Msgs Recebidas</th>
+                                    <th>Perda (%)</th>
+                                    <th>RTT Médio (ms)</th>
+                                    <th>Vazão (msg/s)</th>
+                                    <th>Fora de Ordem %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="academic-table-rows">
+                                <tr>
+                                    <td colspan="7" style="text-align: center; color: #888;">Nenhum benchmark foi executado ainda para popular a tabela comparativa. Inicie um teste no painel de telemetria!</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                </div>
+
+                <!-- PONTOS 6 & 7 (PAGE 8) -->
+                <div class="academic-page">
+                    <div class="academic-section">
+                        <h4>6. Conclusão</h4>
+                        <p>A investigação de campo consolidou experimentalmente os conceitos clássicos expostos pela literatura de redes de computadores. O protocolo <strong>TCP</strong> revela-se a escolha definitiva para serviços com tolerância nula a erros (tais como sistemas financeiros, login seguro em bancos de dados relacionais e transferência de arquivos), visto que manteve 0% de perda e ordenação impecável em todas as cargas testadas. Por outro lado, o **UDP** demonstrou alta superioridade de vazão (throughput) e RTT médio extremamente baixo devido ao baixo overhead estrutural, consolidando-se como excelente alternativa para tráfego multimídia com tolerância a drops ocasionais.</p>
+                    </div>
+
+                    <div class="academic-section" style="margin-top: 40px;">
+                        <h4>7. Referências Bibliográficas</h4>
+                        <ul class="academic-references">
+                            <li>TANENBAUM, Andrew S.; WETHERALL, David J. <em>Redes de Computadores</em>. 5. ed. São Paulo: Pearson, 2011.</li>
+                            <li>KUROSE, James F.; ROSS, Keith W. <em>Redes de Computadores e a Internet: uma abordagem top-down</em>. 6. ed. São Paulo: Pearson, 2013.</li>
+                            <li>DOCUMENTAÇÃO OFICIAL PYTHON. <em>Socket — Low-level networking interface</em>. Disponível em: &lt;https://docs.python.org/3/library/socket.html&gt;.</li>
+                        </ul>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="footer-container">
+            <p>Grupo 01 SD | Engenharia Informática &copy; 2026</p>
+        </div>
+    </footer>
+    
+    <!-- Code script -->
+    <script src="app.js"></script>
+</body>
+</html>
