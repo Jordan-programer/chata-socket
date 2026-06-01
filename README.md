@@ -6,7 +6,7 @@ O projeto traz um núcleo robusto de sockets puros em **Python 3** acoplado a um
 
 ---
 
-## 💥 Parâmetros Comparados
+## Parâmetros Comparados
 * **Tempo de Entrega (Latency / RTT)**: Coleta precisa em microssegundos (`time.perf_counter`) entre o envio e o recebimento de echos.
 * **Perda de Mensagens (Packet Loss Rate)**: Razão estatística de pacotes transmitidos que falharam em retornar.
 * **Uso de CPU & RAM**: Monitoramento ativo em segundo plano dos processos de socket locais via framework `psutil`.
@@ -14,7 +14,7 @@ O projeto traz um núcleo robusto de sockets puros em **Python 3** acoplado a um
 
 ---
 
-## 📁 Estrutura do Projeto
+## Estrutura do Projeto
 * `tcp_server.py` e `tcp_client.py`: Chat persistente em socket TCP clássico com multiplexação por threads.
 * `udp_server.py` e `udp_client.py`: Chat connectionless em socket UDP clássico com suporte a simulação programável de perda de pacotes.
 * `benchmark_orchestrator.py`: Engine de teste estatístico de alta resolução. Dispara instâncias dos servidores em subprocessos isolados, gerencia conexões e monitora telemetria de hardware.
@@ -26,7 +26,7 @@ O projeto traz um núcleo robusto de sockets puros em **Python 3** acoplado a um
 
 ---
 
-## 🛠️ Requisitos de Instalação
+## Requisitos de Instalação
 O projeto utiliza bibliotecas nativas do Python 3, requerendo apenas o módulo `psutil` para a captura de métricas do processador e memória física.
 
 No terminal, instale o requisito:
@@ -36,7 +36,7 @@ pip install psutil
 
 ---
 
-## 🚀 Como Executar o Projeto
+## Como Executar o Projeto
 
 Existem duas formas complementares de usar esta suite: **Modo Dashboard Web (Recomendado)** e **Modo CLI Tradicional**.
 
@@ -64,7 +64,7 @@ Este é o modo ideal para apresentar o trabalho acadêmico. Ele ativa os servido
 
 3. **Acesse no seu Navegador**:
    Abra seu navegador de preferência e acesse:
-   👉 **[http://localhost:8000](http://localhost:8000)**
+    **[http://localhost:8000](http://localhost:8000)**
 
 ---
 
@@ -93,7 +93,7 @@ Se preferir testar apenas o fluxo clássico dos chats em linha de comando como u
 
 ---
 
-## 📊 O Painel de Telemetria e Benchmark Web
+## O Painel de Telemetria e Benchmark Web
 
 Ao abrir o dashboard web, você poderá configurar cenários de estresse científico:
 1. **Quantidade de mensagens**: Altere de 100 até 10.000 pacotes.
