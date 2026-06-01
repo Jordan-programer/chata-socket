@@ -18,13 +18,32 @@ def init_db():
     """Initializes the SQLite database tables."""
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
+    
+    # Check if table users exists and has is_admin column
+    recreate_db = False
+    try:
+        cursor.execute("SELECT is_admin FROM users LIMIT 1")
+    except sqlite3.OperationalError:
+        recreate_db = True
+        
+    try:
+        cursor.execute("SELECT recipient FROM messages LIMIT 1")
+    except sqlite3.OperationalError:
+        recreate_db = True
+        
+    if recreate_db:
+        print("[DB] Esquema antigo detectado. Recriando tabelas...")
+        cursor.execute("DROP TABLE IF EXISTS users")
+        cursor.execute("DROP TABLE IF EXISTS messages")
+        
     # Create users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
             username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL
+            password TEXT NOT NULL,
+            is_admin INTEGER DEFAULT 0
         )
     ''')
     # Create messages table
@@ -33,11 +52,25 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             protocol TEXT NOT NULL,
             sender TEXT NOT NULL,
+            recipient TEXT NOT NULL,
             content TEXT NOT NULL,
             timestamp REAL NOT NULL,
-            seq INTEGER NOT NULL
+            seq INTEGER NOT NULL,
+            delivered INTEGER DEFAULT 0
         )
     ''')
+    
+    # Pre-seed default admin if not present
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    admin_exists = cursor.fetchone()
+    if not admin_exists:
+        admin_pass = hashlib.sha256("admin".encode('utf-8')).hexdigest()
+        cursor.execute(
+            "INSERT INTO users (name, username, password, is_admin) VALUES (?, ?, ?, ?)",
+            ("Administrador", "admin", admin_pass, 1)
+        )
+        print("[DB] Administrador padrão cadastrado com sucesso (admin / admin).")
+        
     conn.commit()
     conn.close()
 
@@ -62,7 +95,9 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
         """Intercepts API GET calls or falls back to serving static files."""
         parsed_url = urllib.parse.urlparse(self.path)
         if parsed_url.path == "/api/chat/messages":
-            self.handle_chat_messages()
+            self.handle_chat_messages(parsed_url)
+        elif parsed_url.path == "/api/users":
+            self.handle_get_users()
         else:
             super().do_GET()
 
@@ -81,25 +116,61 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_error(404, "Endpoint não encontrado")
 
-    def handle_chat_messages(self):
-        """Returns the full list of received chat messages from the SQLite database."""
+    def handle_chat_messages(self, parsed_url):
+        """Returns the full list of received chat messages and handles read receipts."""
         try:
+            query_params = urllib.parse.parse_qs(parsed_url.query)
+            username = query_params.get("username", [None])[0]
+            active_chat = query_params.get("active_chat", [None])[0]
+            
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
-            cursor.execute("SELECT protocol, sender, content, timestamp, seq FROM messages ORDER BY id ASC")
+            
+            # If username and active_chat are provided, mark messages sent to this user from active_chat as delivered
+            if username and active_chat:
+                cursor.execute(
+                    "UPDATE messages SET delivered = 1 WHERE recipient = ? AND sender = ? AND delivered = 0",
+                    (username.lower(), active_chat.lower())
+                )
+                conn.commit()
+                
+            cursor.execute("SELECT id, protocol, sender, recipient, content, timestamp, seq, delivered FROM messages ORDER BY id ASC")
             rows = cursor.fetchall()
             conn.close()
             
             messages = []
             for row in rows:
                 messages.append({
-                    "protocol": row[0],
-                    "sender": row[1],
-                    "content": row[2],
-                    "timestamp": row[3],
-                    "seq": row[4]
+                    "id": row[0],
+                    "protocol": row[1],
+                    "sender": row[2],
+                    "recipient": row[3],
+                    "content": row[4],
+                    "timestamp": row[5],
+                    "seq": row[6],
+                    "delivered": row[7]
                 })
             self.send_json_response(messages)
+        except Exception as e:
+            self.send_json_response({"success": False, "error": str(e)}, status=500)
+
+    def handle_get_users(self):
+        """Returns the list of all registered users."""
+        try:
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute("SELECT name, username, is_admin FROM users ORDER BY name ASC")
+            rows = cursor.fetchall()
+            conn.close()
+            
+            users = []
+            for row in rows:
+                users.append({
+                    "name": row[0],
+                    "username": row[1],
+                    "is_admin": row[2]
+                })
+            self.send_json_response(users)
         except Exception as e:
             self.send_json_response({"success": False, "error": str(e)}, status=500)
 
@@ -155,7 +226,7 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
             
             conn = sqlite3.connect(DB_FILE)
             cursor = conn.cursor()
-            cursor.execute("SELECT name, username FROM users WHERE username = ? AND password = ?", (username, password_hash))
+            cursor.execute("SELECT name, username, is_admin FROM users WHERE username = ? AND password = ?", (username, password_hash))
             user = cursor.fetchone()
             conn.close()
             
@@ -164,7 +235,8 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
                     "success": True, 
                     "user": {
                         "name": user[0],
-                        "username": user[1]
+                        "username": user[1],
+                        "is_admin": user[2]
                     }
                 })
             else:
@@ -212,18 +284,19 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
             params = json.loads(post_data)
             protocol = params.get("protocol", "TCP").upper()
             sender = params.get("sender", "WebUser")
+            recipient = params.get("recipient", "")
             content = params.get("content", "Olá!")
             
             # Run one socket interaction depending on the protocol
             if protocol == "TCP":
-                self.test_single_tcp_message(sender, content)
+                self.test_single_tcp_message(sender, recipient, content)
             else:
-                self.test_single_udp_message(sender, content)
+                self.test_single_udp_message(sender, recipient, content)
                 
         except Exception as e:
             self.send_json_response({"error": f"Erro de processamento: {str(e)}"}, status=400)
 
-    def test_single_tcp_message(self, sender, content):
+    def test_single_tcp_message(self, sender, recipient, content):
         """Spins up a temporary TCP connection to send and receive one message."""
         import socket
         import time
@@ -241,6 +314,7 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
                 "seq": 1,
                 "timestamp": time.time(),
                 "sender": sender,
+                "recipient": recipient,
                 "content": content
             }
             
@@ -278,7 +352,7 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
             traceback.print_exc()
             self.send_json_response({"success": False, "error": str(e)}, status=500)
 
-    def test_single_udp_message(self, sender, content):
+    def test_single_udp_message(self, sender, recipient, content):
         """Sends a single UDP datagram and listens for an echo ACK with a short timeout."""
         import socket
         import time
@@ -295,6 +369,7 @@ class DashboardAPIHandler(http.server.SimpleHTTPRequestHandler):
                 "seq": 1,
                 "timestamp": time.time(),
                 "sender": sender,
+                "recipient": recipient,
                 "content": content
             }
             
@@ -356,6 +431,7 @@ def start_background_listeners():
         
         def on_tcp_msg(msg_data):
             sender = msg_data.get("sender")
+            recipient = msg_data.get("recipient", "")
             content = msg_data.get("content")
             msg_type = msg_data.get("type", "chat")
             # Only listen to chat messages broadcasted to other clients
@@ -368,8 +444,8 @@ def start_background_listeners():
                 conn = sqlite3.connect(DB_FILE)
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO messages (protocol, sender, content, timestamp, seq) VALUES (?, ?, ?, ?, ?)",
-                    ("TCP", sender, content, msg_data.get("timestamp", time.time()), msg_data.get("seq", 0))
+                    "INSERT INTO messages (protocol, sender, recipient, content, timestamp, seq, delivered) VALUES (?, ?, ?, ?, ?, ?, 0)",
+                    ("TCP", sender, recipient, content, msg_data.get("timestamp", time.time()), msg_data.get("seq", 0))
                 )
                 conn.commit()
                 conn.close()
@@ -392,6 +468,7 @@ def start_background_listeners():
         
         def on_udp_msg(msg_data):
             sender = msg_data.get("sender")
+            recipient = msg_data.get("recipient", "")
             content = msg_data.get("content")
             if content in ("HEARTBEAT", "PING") or sender in ("PingTest", "Bench_UDP"):
                 return
@@ -400,8 +477,8 @@ def start_background_listeners():
                 conn = sqlite3.connect(DB_FILE)
                 cursor = conn.cursor()
                 cursor.execute(
-                    "INSERT INTO messages (protocol, sender, content, timestamp, seq) VALUES (?, ?, ?, ?, ?)",
-                    ("UDP", sender, content, msg_data.get("timestamp", time.time()), msg_data.get("seq", 0))
+                    "INSERT INTO messages (protocol, sender, recipient, content, timestamp, seq, delivered) VALUES (?, ?, ?, ?, ?, ?, 0)",
+                    ("UDP", sender, recipient, content, msg_data.get("timestamp", time.time()), msg_data.get("seq", 0))
                 )
                 conn.commit()
                 conn.close()

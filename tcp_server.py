@@ -39,9 +39,10 @@ def handle_client(client_socket, client_address):
                 seq = msg_data.get("seq", 0)
                 ts = msg_data.get("timestamp", 0)
                 sender = msg_data.get("sender", "Anônimo")
+                recipient = msg_data.get("recipient", "")
                 content = msg_data.get("content", "")
                 
-                print(f"[TCP SERVER] Recebido de {sender}: seq={seq}, msg='{content}'")
+                print(f"[TCP SERVER] Recebido de {sender} para {recipient}: seq={seq}, msg='{content}'")
                 
                 # Echo back to the sender for RTT measurement
                 response = {
@@ -49,6 +50,7 @@ def handle_client(client_socket, client_address):
                     "seq": seq,
                     "timestamp": ts,
                     "sender": "SERVER",
+                    "recipient": recipient,
                     "content": content
                 }
                 client_socket.sendall((json.dumps(response) + "\n").encode('utf-8'))
@@ -59,6 +61,7 @@ def handle_client(client_socket, client_address):
                     "seq": seq,
                     "timestamp": ts,
                     "sender": sender,
+                    "recipient": recipient,
                     "content": content
                 }
                 broadcast(json.dumps(chat_broadcast) + "\n", client_socket)

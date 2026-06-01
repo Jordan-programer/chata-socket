@@ -5,6 +5,7 @@ let activeTab = "telemetry";
 let runsHistory = [];
 let latencyChart = null;
 let resourcesChart = null;
+let lastNotifiedMessageId = -1;
 
 // Track the latest run for each protocol to plot comparison metrics
 let latestRuns = {
@@ -38,6 +39,23 @@ document.addEventListener("DOMContentLoaded", () => {
     showAuthPortal();
 });
 
+function toggleAdminTabs() {
+    const tabButtons = document.querySelectorAll(".tabs-nav button");
+    if (currentUser.is_admin === 1) {
+        tabButtons.forEach(btn => btn.style.display = "inline-flex");
+    } else {
+        tabButtons.forEach(btn => {
+            const clickAttr = btn.getAttribute("onclick") || "";
+            if (clickAttr.includes("telemetry") || clickAttr.includes("report")) {
+                btn.style.display = "none";
+            } else {
+                btn.style.display = "inline-flex";
+            }
+        });
+        switchTab("interactive");
+    }
+}
+
 function showDashboard() {
     // Hide auth portal and show dashboard
     document.getElementById("auth-container").style.display = "none";
@@ -47,6 +65,9 @@ function showDashboard() {
     document.getElementById("header-user-name").textContent = currentUser.name;
     document.getElementById("chat-active-user-badge").innerHTML = `<i class="fa-solid fa-user text-cyan"></i> ${currentUser.name} (@${currentUser.username})`;
     
+    // Toggle Admin visibility
+    toggleAdminTabs();
+    
     // Check if servers are running
     checkServerStatuses();
     
@@ -55,6 +76,13 @@ function showDashboard() {
     
     // Periodically ping servers (every 10 seconds)
     setInterval(checkServerStatuses, 10000);
+    
+    // Fetch registered contacts list
+    fetchRegisteredUsers();
+    setInterval(fetchRegisteredUsers, 4000);
+    
+    // Request permission for push notifications
+    requestNotificationPermission();
     
     // Start polling the chat messages in real-time
     startChatPolling();
@@ -97,6 +125,11 @@ function switchTab(tabId) {
             if (latencyChart) latencyChart.resize();
             if (resourcesChart) resourcesChart.resize();
         }, 50);
+    }
+    
+    // Refresh academic report when opening the report tab
+    if (tabId === "report") {
+        updateAcademicReport();
     }
 }
 
@@ -436,6 +469,8 @@ function showAuthAlert(msg, type) {
 function triggerLogout() {
     sessionStorage.removeItem("loggedInUser");
     currentUser = null;
+    lastNotifiedMessageId = -1;
+    selectedRecipient = null;
     showAuthPortal();
     // Reset login form fields
     document.getElementById("login-password").value = "";
@@ -448,6 +483,129 @@ function triggerLogout() {
 let activeChatProtocol = "TCP";
 let localSentRtts = {}; // Map of sender+content -> RTT string
 let lastRenderedMessagesCount = -1;
+let selectedRecipient = null;
+let registeredUsers = [];
+let allMessages = [];
+
+async function fetchRegisteredUsers() {
+    if (!currentUser) return;
+    try {
+        const response = await fetch("/api/users");
+        if (!response.ok) return;
+        registeredUsers = await response.json();
+        renderContactsList();
+    } catch (e) {
+        console.error("Erro ao buscar contatos:", e);
+    }
+}
+
+function renderContactsList() {
+    const container = document.getElementById("contacts-list-container");
+    if (!container) return;
+    
+    container.innerHTML = "";
+    
+    // Exclude current user from contact list
+    const otherUsers = registeredUsers.filter(u => u.username.toLowerCase() !== currentUser.username.toLowerCase());
+    
+    if (otherUsers.length === 0) {
+        container.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted); font-size:0.8rem;">Nenhum outro usuário cadastrado.</div>`;
+        return;
+    }
+    
+    // Scan allMessages to compute unread counts and latest message timestamps
+    const contactLatestTimes = {};
+    const contactUnreadCounts = {};
+    
+    otherUsers.forEach(user => {
+        contactUnreadCounts[user.username] = 0;
+        contactLatestTimes[user.username] = 0;
+    });
+    
+    if (Array.isArray(allMessages)) {
+        allMessages.forEach(msg => {
+            const sender = msg.sender.toLowerCase();
+            const recipient = msg.recipient ? msg.recipient.toLowerCase() : "";
+            const currUser = currentUser.username.toLowerCase();
+            
+            if (sender === currUser && recipient) {
+                contactLatestTimes[recipient] = Math.max(contactLatestTimes[recipient] || 0, msg.timestamp);
+            } else if (recipient === currUser) {
+                contactLatestTimes[sender] = Math.max(contactLatestTimes[sender] || 0, msg.timestamp);
+                
+                // Count as unread if delivered is 0 AND we are NOT currently chatting with them
+                if (msg.delivered === 0 && (!selectedRecipient || selectedRecipient.toLowerCase() !== sender)) {
+                    contactUnreadCounts[sender] = (contactUnreadCounts[sender] || 0) + 1;
+                }
+            }
+        });
+    }
+    
+    // Sort otherUsers: those with latest messages float to the top
+    otherUsers.sort((a, b) => {
+        const timeA = contactLatestTimes[a.username] || 0;
+        const timeB = contactLatestTimes[b.username] || 0;
+        
+        // If times are equal, sort alphabetically by name
+        if (timeA === timeB) {
+            return a.name.localeCompare(b.name);
+        }
+        return timeB - timeA; // Descending (latest on top)
+    });
+    
+    otherUsers.forEach(user => {
+        const isActive = selectedRecipient === user.username;
+        const contactDiv = document.createElement("div");
+        contactDiv.className = `contact-item ${isActive ? 'active' : ''}`;
+        contactDiv.setAttribute("data-username", user.username);
+        
+        const initialLetter = user.name ? user.name.charAt(0).toUpperCase() : "?";
+        const adminBadge = user.is_admin ? `<span class="contact-badge">Admin</span>` : "";
+        
+        // Unread badge markup (green round indicator like WhatsApp)
+        const unreadCount = contactUnreadCounts[user.username] || 0;
+        const unreadBadge = unreadCount > 0 ? `<span class="unread-count-badge animate-pulse-scale">${unreadCount}</span>` : "";
+        
+        contactDiv.innerHTML = `
+            <div class="contact-avatar">${initialLetter}</div>
+            <div class="contact-info">
+                <span class="contact-name">${user.name}</span>
+                <span class="contact-username">@${user.username}</span>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+                ${adminBadge}
+                ${unreadBadge}
+            </div>
+        `;
+        
+        contactDiv.onclick = () => selectContact(user.username, user.name);
+        container.appendChild(contactDiv);
+    });
+}
+
+function selectContact(username, name) {
+    selectedRecipient = username;
+    
+    // Update active state in list
+    const items = document.querySelectorAll(".contact-item");
+    items.forEach(item => {
+        item.classList.remove("active");
+        if (item.getAttribute("data-username") === username) {
+            item.classList.add("active");
+        }
+    });
+    
+    // Update panes visibilities
+    document.getElementById("chat-empty-state").style.display = "none";
+    document.getElementById("chat-active-pane").style.display = "flex";
+    
+    // Set labels
+    document.getElementById("chat-recipient-name-lbl").textContent = `${name} (@${username})`;
+    
+    // Force poll instantly
+    lastRenderedMessagesCount = -1;
+    fetchChatMessages();
+}
 
 function selectChatProtocol(protocol) {
     if (activeChatProtocol === protocol) return;
@@ -486,7 +644,7 @@ function handleUnifiedChatKey(event) {
 }
 
 async function sendUnifiedMessage() {
-    if (!currentUser) return;
+    if (!currentUser || !selectedRecipient) return;
     
     const input = document.getElementById("unified-chat-input");
     if (!input) return;
@@ -511,6 +669,7 @@ async function sendUnifiedMessage() {
             body: JSON.stringify({
                 protocol: activeChatProtocol,
                 sender: currentUser.username,
+                recipient: selectedRecipient,
                 content: text
             })
         });
@@ -587,20 +746,61 @@ function startChatPolling() {
 }
 
 async function fetchChatMessages() {
-    if (activeTab !== "interactive" || !currentUser) return;
+    if (!currentUser) return;
     
     try {
-        const response = await fetch("/api/chat/messages");
+        // We pass active_chat so messages from them are immediately marked as delivered/read
+        const activeChatParam = selectedRecipient ? `&active_chat=${encodeURIComponent(selectedRecipient)}` : "";
+        const response = await fetch(`/api/chat/messages?username=${encodeURIComponent(currentUser.username)}${activeChatParam}`);
         if (!response.ok) return;
         
         const messages = await response.json();
+        allMessages = messages; // Save globally
         
-        // Filter messages by active protocol
-        const filtered = messages.filter(m => m.protocol === activeChatProtocol);
+        // Dynamic contact sorting & unread badge calculations
+        renderContactsList();
         
-        if (filtered.length !== lastRenderedMessagesCount) {
-            renderUnifiedChatRoom(filtered);
-            lastRenderedMessagesCount = filtered.length;
+        // --- NOTIFICATION ENGINE ---
+        if (lastNotifiedMessageId === -1) {
+            if (messages.length > 0) {
+                lastNotifiedMessageId = Math.max(...messages.map(m => m.id || 0));
+            } else {
+                lastNotifiedMessageId = 0;
+            }
+        } else {
+            messages.forEach(m => {
+                if (m.id > lastNotifiedMessageId) {
+                    lastNotifiedMessageId = Math.max(lastNotifiedMessageId, m.id);
+                    
+                    // Check if the message is addressed to the current logged-in user and not sent by them
+                    if (m.recipient && m.recipient.toLowerCase() === currentUser.username.toLowerCase() && 
+                        m.sender.toLowerCase() !== currentUser.username.toLowerCase()) {
+                        
+                        // Trigger notification!
+                        triggerIncomingMessageNotification(m);
+                    }
+                }
+            });
+        }
+        // ----------------------------
+        
+        // Render the chat ONLY if we are in the interactive chat tab and have a selected recipient
+        if (activeTab === "interactive" && selectedRecipient) {
+            // Filter messages by BOTH protocol and sender/recipient match
+            const filtered = messages.filter(m => {
+                const isProto = m.protocol === activeChatProtocol;
+                const senderMatch = m.sender.toLowerCase() === currentUser.username.toLowerCase() && m.recipient.toLowerCase() === selectedRecipient.toLowerCase();
+                const recipientMatch = m.sender.toLowerCase() === selectedRecipient.toLowerCase() && m.recipient.toLowerCase() === currentUser.username.toLowerCase();
+                return isProto && (senderMatch || recipientMatch);
+            });
+            
+            // Compute active check count or signature to detect delivery receipt changes
+            const renderSignature = filtered.map(m => `${m.delivered}-${m.seq}`).join(",");
+            if (filtered.length !== lastRenderedMessagesCount || this.lastRenderSignature !== renderSignature) {
+                renderUnifiedChatRoom(filtered);
+                lastRenderedMessagesCount = filtered.length;
+                this.lastRenderSignature = renderSignature;
+            }
         }
     } catch (error) {
         // Silent poll error
@@ -612,31 +812,38 @@ function renderUnifiedChatRoom(messages) {
     if (!container) return;
     
     container.innerHTML = `
-        <div class="chat-system-msg">Canal ${activeChatProtocol} estabelecido. Envie mensagens para os demais usuários!</div>
+        <div class="chat-system-msg">Canal ${activeChatProtocol} privado com @${selectedRecipient} estabelecido.</div>
     `;
     
     messages.forEach(msg => {
         const sender = msg.sender;
         const content = msg.content;
         const uniqueMsgKey = `${sender}-${content}`;
+        const delivered = msg.delivered === 1;
         
         const isSelf = (sender.toLowerCase() === currentUser.username.toLowerCase());
         const direction = isSelf ? `sent ${activeChatProtocol === 'TCP' ? 'alice-msg' : 'bob-msg'}` : "received";
         const rtt = isSelf ? (localSentRtts[uniqueMsgKey] || null) : null;
         
         const displayName = isSelf ? "Você" : sender;
-        appendUnifiedBubble(container, displayName, content, direction, rtt);
+        appendUnifiedBubble(container, displayName, content, direction, rtt, delivered);
     });
 }
 
-function appendUnifiedBubble(container, sender, content, direction, rtt = null) {
+function appendUnifiedBubble(container, sender, content, direction, rtt = null, delivered = false) {
     const bubbleRow = document.createElement("div");
     bubbleRow.className = `chat-msg-row ${direction}`;
     
     let metaHtml = "";
-    if (rtt !== null) {
-        metaHtml = `<div class="msg-meta-row">RTT: <span class="rtt-stat">${rtt}</span></div>`;
-    } else if (direction.includes("received")) {
+    if (direction.includes("sent")) {
+        // Render checkmarks
+        const checkmarks = delivered ? 
+            `<span class="msg-status-receipt delivered" title="Acusação de Recepção Confirmada"><i class="fa-solid fa-check-double"></i> Recebida</span>` : 
+            `<span class="msg-status-receipt sent-only" title="Mensagem Enviada"><i class="fa-solid fa-check"></i> Enviada</span>`;
+            
+        const rttText = rtt !== null ? `RTT: <span class="rtt-stat">${rtt}</span> | ` : "";
+        metaHtml = `<div class="msg-meta-row">${rttText}${checkmarks}</div>`;
+    } else {
         metaHtml = `<div class="msg-meta-row">Recebido</div>`;
     }
     
@@ -850,4 +1057,72 @@ function updateAcademicReport() {
     
     findingsHtml += `</div>`;
     findingsDiv.innerHTML = findingsHtml;
+}
+
+// -------------------------------------------------------------
+// NATIVE PUSH NOTIFICATIONS & AUDIO SYNTHESIS
+// -------------------------------------------------------------
+function requestNotificationPermission() {
+    if ("Notification" in window) {
+        if (Notification.permission === "default") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    appendToConsole("[SISTEMA] Permissão para notificações concedida!", "system");
+                }
+            });
+        }
+    }
+}
+
+function playNotificationSound() {
+    try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5 tone
+        oscillator.frequency.exponentialRampToValueAtTime(880.00, audioCtx.currentTime + 0.1); // A5 tone
+        
+        gainNode.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+        
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 0.35);
+    } catch (e) {
+        console.error("[NOTIFICAÇÃO AUDIO] Erro ao sintetizar som:", e);
+    }
+}
+
+function triggerIncomingMessageNotification(msg) {
+    // 1. Synthesize bell alert sound
+    playNotificationSound();
+    
+    // 2. Spawn HTML5 desktop push notification if permission is allowed
+    if ("Notification" in window && Notification.permission === "granted") {
+        const title = `Nova mensagem de @${msg.sender} [${msg.protocol}]`;
+        const options = {
+            body: msg.content,
+            icon: "unia_logo.png",
+            tag: `msg-${msg.sender}`, // Deduplicate alerts for same sender
+            renotify: true
+        };
+        
+        try {
+            const n = new Notification(title, options);
+            n.onclick = () => {
+                window.focus();
+                // Find and automatically select the sender to switch chats instantly!
+                const contact = registeredUsers.find(u => u.username.toLowerCase() === msg.sender.toLowerCase());
+                if (contact) {
+                    selectContact(contact.username, contact.name);
+                }
+            };
+        } catch (e) {
+            console.error("[NOTIFICAÇÃO PUSH] Falha ao instanciar objeto de notificação:", e);
+        }
+    }
 }

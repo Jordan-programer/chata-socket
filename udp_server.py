@@ -53,9 +53,10 @@ def start_server(host=HOST, port=PORT, loss_rate=0.0):
                     seq = msg_data.get("seq", 0)
                     ts = msg_data.get("timestamp", 0)
                     sender = msg_data.get("sender", "Anônimo")
+                    recipient = msg_data.get("recipient", "")
                     content = msg_data.get("content", "")
                     
-                    print(f"[UDP SERVER] Recebido de {sender}: seq={seq}, msg='{content}' de {client_address}")
+                    print(f"[UDP SERVER] Recebido de {sender} para {recipient}: seq={seq}, msg='{content}' de {client_address}")
                     
                     # Echo back to the sender for RTT measurement
                     response = {
@@ -63,6 +64,7 @@ def start_server(host=HOST, port=PORT, loss_rate=0.0):
                         "seq": seq,
                         "timestamp": ts,
                         "sender": "SERVER",
+                        "recipient": recipient,
                         "content": content
                     }
                     server_socket.sendto(json.dumps(response).encode('utf-8'), client_address)
@@ -84,6 +86,7 @@ def start_server(host=HOST, port=PORT, loss_rate=0.0):
                                 "seq": seq,
                                 "timestamp": ts,
                                 "sender": sender,
+                                "recipient": recipient,
                                 "content": content
                             }
                             broadcast_bytes = (json.dumps(chat_broadcast) + "\n").encode('utf-8')

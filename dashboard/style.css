@@ -677,7 +677,7 @@ tr:hover td {
 
 .chat-grid {
     display: grid;
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 280px 1fr;
     gap: 24px;
 }
 
@@ -1556,5 +1556,158 @@ footer {
 .logout-btn:hover {
     color: #ef4444 !important;
     transform: scale(1.15);
+}
+
+/* Sidebar de Contatos */
+.chat-sidebar {
+    display: flex;
+    flex-direction: column;
+    height: 480px;
+    background: rgba(18, 24, 36, 0.65);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    overflow: hidden;
+}
+
+.chat-sidebar-header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--glass-border);
+    font-weight: 700;
+    font-family: var(--font-heading);
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.contacts-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    color: var(--text-secondary);
+}
+
+.contact-item:hover {
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--text-primary);
+}
+
+.contact-item.active {
+    background: rgba(6, 182, 212, 0.1);
+    border-left: 3px solid var(--tcp-color);
+    color: white;
+}
+
+.contact-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--tcp-color) 0%, var(--purple-color) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 0.95rem;
+}
+
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+.contact-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.contact-username {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+}
+
+.contact-badge {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    background: rgba(168, 85, 247, 0.2);
+    color: var(--purple-color);
+    border: 1px solid rgba(168, 85, 247, 0.3);
+    text-transform: uppercase;
+    align-self: flex-start;
+}
+
+/* Chat Vazio / Sem seleção */
+.chat-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 40px;
+}
+
+.chat-empty-icon {
+    font-size: 3rem;
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, var(--tcp-color) 0%, var(--purple-color) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+/* Double Check visual logic */
+.msg-status-receipt {
+    margin-left: auto;
+    font-size: 0.75rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.msg-status-receipt.delivered {
+    color: #10b981; /* Green check */
+}
+
+.msg-status-receipt.sent-only {
+    color: var(--text-muted); /* Gray check */
+}
+
+/* WhatsApp unread message count badge */
+.unread-count-badge {
+    background-color: var(--success-color); /* Bright green like WhatsApp */
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    min-width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
+    align-self: center;
+    animation: pulseScale 1.5s infinite ease-in-out;
+}
+
+@keyframes pulseScale {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.1); box-shadow: 0 0 10px rgba(16, 185, 129, 0.6); }
+    100% { transform: scale(1); }
 }
 

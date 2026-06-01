@@ -315,28 +315,52 @@
                     </div>
                     
                     <div class="chat-grid">
-                        <!-- Unified Chat Room Card -->
-                        <div class="glass-card chat-card-wrapper tcp-theme main-chat-room">
-                            <div class="chat-wrapper-header">
-                                <div class="chat-title">
-                                    <i class="fa-solid fa-comments text-cyan"></i>
-                                    <div>
-                                        <h4>Sala de Conversa Geral</h4>
-                                        <span class="chat-conn-type" id="chat-active-protocol-lbl">Canal: TCP (Conexão Persistente)</span>
-                                    </div>
+                        <!-- Sidebar de Contatos -->
+                        <div class="chat-sidebar">
+                            <div class="chat-sidebar-header">
+                                <i class="fa-solid fa-address-book text-cyan"></i>
+                                <span>Contatos Ativos</span>
+                            </div>
+                            <div class="contacts-list" id="contacts-list-container">
+                                <!-- Contatos dinâmicos alimentados por JavaScript -->
+                                <div style="padding: 20px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">
+                                    <i class="fa-solid fa-circle-notch animate-spin"></i> Carregando contatos...
                                 </div>
-                                <span class="pulse-badge active" id="chat-active-user-badge"><i class="fa-solid fa-user text-cyan"></i> Visitante</span>
                             </div>
-                            
-                            <div class="chat-messages" id="unified-chat-messages">
-                                <div class="chat-system-msg">Bem-vindo à sala de sockets. Envie uma mensagem no prompt!</div>
+                        </div>
+
+                        <!-- Chat Area Pane -->
+                        <div class="glass-card chat-card-wrapper tcp-theme main-chat-room" id="chat-window-pane">
+                            <!-- Estado Vazio (quando não selecionado) -->
+                            <div class="chat-empty-state" id="chat-empty-state" style="display: flex;">
+                                <i class="fa-solid fa-comments chat-empty-icon animate-pulse"></i>
+                                <h4>Laboratório de Chat Privado</h4>
+                                <p style="font-size: 0.82rem; margin-top: 6px;">Selecione um utilizador na barra lateral para iniciar a conversa.</p>
                             </div>
-                            
-                            <div class="chat-input-row">
-                                <input type="text" id="unified-chat-input" placeholder="Digite uma mensagem..." onkeydown="handleUnifiedChatKey(event)">
-                                <button class="chat-send-btn btn-tcp" id="unified-send-btn" onclick="sendUnifiedMessage()">
-                                    <i class="fa-solid fa-paper-plane"></i>
-                                </button>
+
+                            <!-- Interface Real do Chat (Oculta por padrão até selecionar contato) -->
+                            <div id="chat-active-pane" style="display: none; flex-direction: column; height: 100%;">
+                                <div class="chat-wrapper-header">
+                                    <div class="chat-title">
+                                        <i class="fa-solid fa-user-astronaut text-cyan" id="chat-recipient-avatar-icon"></i>
+                                        <div>
+                                            <h4 id="chat-recipient-name-lbl">Selecione um contato</h4>
+                                            <span class="chat-conn-type" id="chat-active-protocol-lbl">Canal: TCP (Conexão Persistente)</span>
+                                        </div>
+                                    </div>
+                                    <span class="pulse-badge active" id="chat-active-user-badge"><i class="fa-solid fa-user text-cyan"></i> Visitante</span>
+                                </div>
+                                
+                                <div class="chat-messages" id="unified-chat-messages" style="flex: 1;">
+                                    <div class="chat-system-msg">Conexão iniciada. Digite no prompt!</div>
+                                </div>
+                                
+                                <div class="chat-input-row">
+                                    <input type="text" id="unified-chat-input" placeholder="Digite uma mensagem..." onkeydown="handleUnifiedChatKey(event)">
+                                    <button class="chat-send-btn btn-tcp" id="unified-send-btn" onclick="sendUnifiedMessage()">
+                                        <i class="fa-solid fa-paper-plane"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -483,7 +507,7 @@
                 <!-- PONTO 4 (PAGE 6) -->
                 <div class="academic-page">
                     <div class="academic-section">
-                        <h4>4. Desenvolvimento das Aplicações</h4>
+                        <h4>4. Desenvolvimento das Aplicações e Tecnologias</h4>
                         <p>A implementação conceitual seguiu os padrões clássicos das APIs de sockets BSD do Python. O trecho síncrono a seguir ilustra a abertura do canal de escuta e configurações de reuso nos servidores TCP e UDP:</p>
                         <pre><code># Abstração de inicialização clássica TCP
 server_tcp = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -494,10 +518,20 @@ server_tcp.listen(10)
 # Abstração de inicialização clássica UDP
 server_udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server_udp.bind(('127.0.0.1', 5002))</code></pre>
-                        <p>Para garantir a segurança acadêmica do portal e persistência dos dados concorrentes do chat geral, integramos uma base de dados relacional <strong>SQLite</strong> (`chat_database.db`). Criamos duas tabelas principais:</p>
+                        
+                        <p><strong>Tecnologias e Linguagens Utilizadas:</strong></p>
                         <ul>
-                            <li><strong>`users`</strong>: Armazena o ID, Nome Completo, Nome de Utilizador (UNIQUE para impedir registros duplicados), e o hash de senha criptográfica de via única (SHA-256 via `hashlib`).</li>
-                            <li><strong>`messages`</strong>: Persiste o protocolo (TCP/UDP), o nome de utilizador do remetente, o conteúdo bruto do payload de texto, o timestamp Unix de alta resolução, e o número lógico de sequência da mensagem.</li>
+                            <li><strong>Linguagem Python (v3.10+)</strong>: Utilizada no backend para estruturar os servidores de Sockets TCP e UDP nativos e concorrentes, além do servidor web multithreading (<code>web_dashboard_server.py</code>) e do orquestrador de telemetria (<code>benchmark_orchestrator.py</code>).</li>
+                            <li><strong>Linguagem SQL (SQLite3)</strong>: Utilizada no banco de dados local (<code>chat_database.db</code>) para assegurar a persistência relacional de contas, histórico e metadados de entrega.</li>
+                            <li><strong>Linguagens HTML5 e CSS3</strong>: Empregadas na montagem estrutural e design de interface (utilizando técnicas avançadas de Glassmorphism, harmonia de cores e design adaptivo premium).</li>
+                            <li><strong>Linguagem JavaScript (ES6)</strong>: Utilizada no frontend para interatividade, controle das sessões, requisições de API assíncronas (fetch), polling dinâmico a cada 500ms e plotagem dos gráficos de recursos de CPU/RAM via Chart.js.</li>
+                        </ul>
+
+                        <p><strong>Arquitetura de Segurança, Chat Privado e Acusação de Recepção:</strong></p>
+                        <p>A aplicação evoluiu de um chat público para um ecossistema de <strong>Chat Privado (1-para-1)</strong> de ponta, agregando as seguintes inovações:</p>
+                        <ul>
+                            <li><strong>Acusação de Recepção Automática</strong>: Quando o emissor envia uma mensagem direta, o status inicial é "✓ Enviada". No instante exato em que o receptor acessa a conversa e seu navegador faz o polling para obter as mensagens, o backend atualiza a flag <code>delivered = 1</code> no SQLite. O remetente recebe a notificação no ciclo seguinte, atualizando a mensagem visualmente para <code>✓✓ Recebida</code> em verde.</li>
+                            <li><strong>Role-based Access Control (RBAC)</strong>: Para blindar os testes acadêmicos e relatórios, adicionamos a flag de privilégio <code>is_admin</code> na tabela de utilizadores. Usuários comuns visualizam apenas a interface do Chat Privado. A aba "Painel de Telemetria" (onde são acionados os testes de estresse de sockets) e a aba "Relatório Académico" são ocultadas para não-admins, ficando reservadas estritamente ao utilizador <code>admin</code> (pré-semeado no banco com senha criptografada).</li>
                         </ul>
                     </div>
                 </div>
@@ -530,6 +564,7 @@ server_udp.bind(('127.0.0.1', 5002))</code></pre>
                         </table>
                     </div>
 
+                    <div id="academic-telemetry-findings"></div>
                 </div>
 
                 <!-- PONTOS 6 & 7 (PAGE 8) -->
